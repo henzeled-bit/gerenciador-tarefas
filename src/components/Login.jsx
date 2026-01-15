@@ -14,11 +14,10 @@ export default function Login({ onSignIn }) {
 
   useEffect(() => {
     // Detectar se veio do link de recuperação
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
-    const accessToken = hashParams.get('access_token')
-    const type = hashParams.get('type')
-
-    if (type === 'recovery' && accessToken) {
+    const hash = window.location.hash
+    
+    // Verificar se tem type=recovery na URL
+    if (hash.includes('type=recovery') || hash.includes('type%3Drecovery')) {
       setModoResetSenha(true)
     }
   }, [])

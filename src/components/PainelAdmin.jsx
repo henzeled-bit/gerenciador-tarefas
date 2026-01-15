@@ -82,7 +82,7 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     tarefas.forEach(tarefa => {
       if (!responsaveis[tarefa.responsavel]) {
         responsaveis[tarefa.responsavel] = {
-          nome: tarefa.responsavel,
+          nome: tarefa.responsavel_nome || tarefa.responsavel,
           total: 0,
           concluidas: 0,
           ativas: 0,
@@ -152,13 +152,21 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
   ]
 
   // Lista de responsáveis para filtro
-  const responsaveis = [...new Set(tarefas.map(t => t.responsavel))].sort()
+  const responsaveisUnicos = useMemo(() => {
+    const map = new Map()
+    tarefas.forEach(t => {
+      if (!map.has(t.responsavel)) {
+        map.set(t.responsavel, t.responsavel_nome || t.responsavel)
+      }
+    })
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [tarefas])
 
   function exportarExcel() {
     // Preparar dados
     const dadosExport = tarefas.map(t => ({
       'Descrição': t.descricao,
-      'Responsável': t.responsavel,
+      'Responsável': t.responsavel_nome || t.responsavel,
       'Data Prazo': t.prazo_data || '-',
       'Hora Prazo': t.prazo_hora || '-',
       'Status': t.status,
@@ -215,8 +223,8 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="todos">Todos</option>
-              {responsaveis.map(resp => (
-                <option key={resp} value={resp}>{resp}</option>
+              {responsaveisUnicos.map(([id, nome]) => (
+                <option key={id} value={id}>{nome}</option>
               ))}
             </select>
           </div>

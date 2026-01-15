@@ -28,15 +28,16 @@ export default function ModalTarefa({ tarefa, mode, onClose, onSuccess }) {
 
   async function loadResponsaveis() {
     try {
-      // Buscar lista única de responsáveis das tarefas existentes
+      // Buscar todos os perfis ativos
       const { data, error } = await supabase
-        .from('tarefas')
-        .select('responsavel')
+        .from('profiles')
+        .select('id, nome')
+        .eq('ativo', true)
+        .order('nome')
       
       if (error) throw error
       
-      const uniqueResponsaveis = [...new Set(data.map(t => t.responsavel).filter(Boolean))]
-      setResponsaveis(uniqueResponsaveis)
+      setResponsaveis(data || [])
     } catch (error) {
       console.error('Erro ao carregar responsáveis:', error)
     }
@@ -100,18 +101,19 @@ export default function ModalTarefa({ tarefa, mode, onClose, onSuccess }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Responsável *
             </label>
-            <input
-              list="responsaveis-list"
+            <select
               value={formData.responsavel}
               onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
-            />
-            <datalist id="responsaveis-list">
-              {responsaveis.map((resp, idx) => (
-                <option key={idx} value={resp} />
+            >
+              <option value="">Selecione um responsável</option>
+              {responsaveis.map((resp) => (
+                <option key={resp.id} value={resp.id}>
+                  {resp.nome}
+                </option>
               ))}
-            </datalist>
+            </select>
           </div>
 
           <div>

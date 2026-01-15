@@ -18,11 +18,21 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
     try {
       const { data, error } = await supabase
         .from('tarefas')
-        .select('*')
+        .select(`
+          *,
+          profiles:responsavel (nome)
+        `)
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setTarefas(data || [])
+      
+      // Adicionar o nome do responsável diretamente na tarefa
+      const tarefasComNomes = (data || []).map(tarefa => ({
+        ...tarefa,
+        responsavel_nome: tarefa.profiles?.nome || 'Desconhecido'
+      }))
+      
+      setTarefas(tarefasComNomes)
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error)
     } finally {

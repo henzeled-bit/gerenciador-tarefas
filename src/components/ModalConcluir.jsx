@@ -71,7 +71,7 @@ export default function ModalConcluir({ tarefa, onClose, onSuccess }) {
             <span className="font-medium">Descrição:</span> {tarefa.descricao}
           </p>
           <p className="text-gray-700">
-            <span className="font-medium">Responsável:</span> {tarefa.responsavel}
+            <span className="font-medium">Responsável:</span> {tarefa.responsavel_nome}
           </p>
         </div>
 

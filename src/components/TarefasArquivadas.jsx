@@ -26,14 +26,20 @@ export default function TarefasArquivadas({ tarefas, isAdmin }) {
                     <h3 className="text-lg font-semibold text-gray-900">
                       {tarefa.descricao}
                     </h3>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Concluída
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      tarefa.justificativa && tarefa.justificativa !== 'Usuário informou que não estava atrasada'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {tarefa.justificativa && tarefa.justificativa !== 'Usuário informou que não estava atrasada'
+                        ? 'Concluída com atraso'
+                        : 'Concluída'}
                     </span>
                   </div>
                   
                   <div className="space-y-1 text-sm text-gray-600">
                     <p>
-                      <span className="font-medium">Responsável:</span> {tarefa.responsavel}
+                      <span className="font-medium">Responsável:</span> {tarefa.responsavel_nome}
                     </p>
                     <p>
                       <span className="font-medium">Concluída em:</span>{' '}

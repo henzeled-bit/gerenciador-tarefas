@@ -1,13 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function Login({ onSignIn }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [novaSenha, setNovaSenha] = useState('')
+  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [modoRecuperacao, setModoRecuperacao] = useState(false)
+  const [modoResetSenha, setModoResetSenha] = useState(false)
   const [mensagemSucesso, setMensagemSucesso] = useState('')
+
+  useEffect(() => {
+    // Detectar se veio do link de recuperação
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const accessToken = hashParams.get('access_token')
+    const type = hashParams.get('type')
+
+    if (type === 'recovery' && accessToken) {
+      setModoResetSenha(true)
+    }
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -15,10 +29,37 @@ export default function Login({ onSignIn }) {
     setError(null)
     setMensagemSucesso('')
 
-    if (modoRecuperacao) {
+    if (modoResetSenha) {
+      // Resetar senha
+      if (novaSenha.length < 6) {
+        setError('A senha deve ter pelo menos 6 caracteres')
+        setLoading(false)
+        return
+      }
+
+      if (novaSenha !== confirmarNovaSenha) {
+        setError('As senhas não conferem')
+        setLoading(false)
+        return
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: novaSenha
+      })
+
+      if (updateError) {
+        setError('Erro ao atualizar senha: ' + updateError.message)
+      } else {
+        setMensagemSucesso('Senha atualizada com sucesso! Faça login com a nova senha.')
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 2000)
+      }
+      setLoading(false)
+    } else if (modoRecuperacao) {
       // Recuperação de senha
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/#type=recovery`,
       })
 
       if (resetError) {
@@ -46,39 +87,81 @@ export default function Login({ onSignIn }) {
             Gerenciador de Tarefas
           </h1>
           <p className="text-gray-600">
-            {modoRecuperacao ? 'Recuperar senha' : 'Faça login para continuar'}
+            {modoResetSenha 
+              ? 'Defina sua nova senha' 
+              : modoRecuperacao 
+              ? 'Recuperar senha' 
+              : 'Faça login para continuar'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="seu@email.com"
-              required
-            />
-          </div>
+          {modoResetSenha ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nova Senha
+                </label>
+                <input
+                  type="password"
+                  value={novaSenha}
+                  onChange={(e) => setNovaSenha(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Mínimo de 6 caracteres
+                </p>
+              </div>
 
-          {!modoRecuperacao && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Senha
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirmar Nova Senha
+                </label>
+                <input
+                  type="password"
+                  value={confirmarNovaSenha}
+                  onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
+
+              {!modoRecuperacao && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Senha
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+              )}
+            </>
           )}
 
           {error && (
@@ -99,24 +182,26 @@ export default function Login({ onSignIn }) {
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             {loading 
-              ? (modoRecuperacao ? 'Enviando...' : 'Entrando...') 
-              : (modoRecuperacao ? 'Enviar Email' : 'Entrar')
+              ? (modoResetSenha ? 'Atualizando...' : modoRecuperacao ? 'Enviando...' : 'Entrando...') 
+              : (modoResetSenha ? 'Atualizar Senha' : modoRecuperacao ? 'Enviar Email' : 'Entrar')
             }
           </button>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setModoRecuperacao(!modoRecuperacao)
-                setError(null)
-                setMensagemSucesso('')
-              }}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              {modoRecuperacao ? '← Voltar para login' : 'Esqueci minha senha'}
-            </button>
-          </div>
+          {!modoResetSenha && (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setModoRecuperacao(!modoRecuperacao)
+                  setError(null)
+                  setMensagemSucesso('')
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {modoRecuperacao ? '← Voltar para login' : 'Esqueci minha senha'}
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

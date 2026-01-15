@@ -85,7 +85,7 @@ export default function TarefasAtivas({ tarefas, isAdmin, userId, onUpdate }) {
                     </h3>
                     <div className="space-y-1 text-sm text-gray-600">
                       <p>
-                        <span className="font-medium">Responsável:</span> {tarefa.responsavel}
+                        <span className="font-medium">Responsável:</span> {tarefa.responsavel_nome}
                       </p>
                       <p>
                         <span className="font-medium">Prazo:</span>{' '}
@@ -106,7 +106,7 @@ export default function TarefasAtivas({ tarefas, isAdmin, userId, onUpdate }) {
                   </div>
 
                   <div className="flex gap-2 ml-4">
-                    {!isAdmin && (
+                    {(tarefa.responsavel === userId || isAdmin) && (
                       <button
                         onClick={() => setModalConcluir(tarefa)}
                         className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm font-medium"

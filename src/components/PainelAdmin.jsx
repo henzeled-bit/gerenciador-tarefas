@@ -162,6 +162,39 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
   }, [tarefas])
 
+  function calcularStatusDetalhado(tarefa) {
+    if (tarefa.status !== 'concluido') {
+      return tarefa.status
+    }
+
+    if (!tarefa.prazo_data || !tarefa.concluido_em) {
+      return 'Concluída'
+    }
+
+    const prazoDate = new Date(tarefa.prazo_data)
+    if (tarefa.prazo_hora) {
+      const [hora, minuto] = tarefa.prazo_hora.split(':')
+      prazoDate.setHours(parseInt(hora), parseInt(minuto))
+    } else {
+      prazoDate.setHours(23, 59, 59)
+    }
+
+    const concluidoDate = new Date(tarefa.concluido_em)
+
+    if (concluidoDate <= prazoDate) {
+      return 'Concluída no prazo'
+    }
+
+    if (tarefa.justificativa) {
+      if (tarefa.justificativa === 'Usuário informou que não estava atrasada') {
+        return 'Concluída no prazo'
+      }
+      return 'Concluída com atraso justificado'
+    }
+
+    return 'Concluída com atraso'
+  }
+
   function exportarExcel() {
     // Preparar dados
     const dadosExport = tarefas.map(t => ({
@@ -169,7 +202,7 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
       'Responsável': t.responsavel_nome || t.responsavel,
       'Data Prazo': t.prazo_data || '-',
       'Hora Prazo': t.prazo_hora || '-',
-      'Status': t.status,
+      'Status': calcularStatusDetalhado(t),
       'Criada em': t.created_at,
       'Concluída em': t.concluido_em || '-',
       'Justificativa': t.justificativa || '-'

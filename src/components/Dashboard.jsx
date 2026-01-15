@@ -128,6 +128,7 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
               <TarefasArquivadas
                 tarefas={tarefasArquivadas}
                 isAdmin={isAdmin}
+                onUpdate={loadTarefas}
               />
             )}
             {activeTab === 'admin' && isAdmin && (

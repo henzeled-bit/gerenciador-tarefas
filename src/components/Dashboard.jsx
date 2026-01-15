@@ -3,11 +3,13 @@ import { supabase } from '../lib/supabase'
 import TarefasAtivas from './TarefasAtivas'
 import TarefasArquivadas from './TarefasArquivadas'
 import PainelAdmin from './PainelAdmin'
+import ModalTrocarSenha from './ModalTrocarSenha'
 
 export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
   const [activeTab, setActiveTab] = useState('ativas')
   const [tarefas, setTarefas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [modalTrocarSenha, setModalTrocarSenha] = useState(false)
 
   useEffect(() => {
     loadTarefas()
@@ -57,12 +59,20 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
                 {profile?.nome} {isAdmin && <span className="text-blue-600">(Administrador)</span>}
               </p>
             </div>
-            <button
-              onClick={onSignOut}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
-            >
-              Sair
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setModalTrocarSenha(true)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+              >
+                🔒 Trocar Senha
+              </button>
+              <button
+                onClick={onSignOut}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+              >
+                Sair
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -137,6 +147,11 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
           </>
         )}
       </div>
+
+      {/* Modal Trocar Senha */}
+      {modalTrocarSenha && (
+        <ModalTrocarSenha onClose={() => setModalTrocarSenha(false)} />
+      )}
     </div>
   )
 }

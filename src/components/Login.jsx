@@ -13,22 +13,33 @@ export default function Login({ onSignIn }) {
   const [mensagemSucesso, setMensagemSucesso] = useState('')
 
   useEffect(() => {
-    // Detectar mudanças de autenticação (incluindo recovery)
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    async function processRecovery() {
+      const hash = window.location.hash
+      
+      // Verificar se tem token de recovery na URL
+      if (hash.includes('type=recovery') && hash.includes('access_token=')) {
         setModoResetSenha(true)
+        
+        // Extrair tokens da URL
+        const params = new URLSearchParams(hash.substring(1).replace('type=recovery#', '').replace('type=recovery%23', ''))
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+        
+        if (accessToken) {
+          // Estabelecer sessão com o token
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || ''
+          })
+          
+          if (error) {
+            console.error('Erro ao estabelecer sessão:', error)
+          }
+        }
       }
-    })
-
-    // Verificar hash na URL para detecção imediata
-    const hash = window.location.hash
-    if (hash.includes('type=recovery')) {
-      setModoResetSenha(true)
     }
-
-    return () => {
-      authListener?.subscription?.unsubscribe()
-    }
+    
+    processRecovery()
   }, [])
 
   async function handleSubmit(e) {

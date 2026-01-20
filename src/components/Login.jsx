@@ -13,12 +13,21 @@ export default function Login({ onSignIn }) {
   const [mensagemSucesso, setMensagemSucesso] = useState('')
 
   useEffect(() => {
-    // Detectar se veio do link de recuperação
+    // Detectar mudanças de autenticação (incluindo recovery)
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setModoResetSenha(true)
+      }
+    })
+
+    // Verificar hash na URL para detecção imediata
     const hash = window.location.hash
-    
-    // Verificar se tem type=recovery na URL
-    if (hash.includes('type=recovery') || hash.includes('type%3Drecovery')) {
+    if (hash.includes('type=recovery')) {
       setModoResetSenha(true)
+    }
+
+    return () => {
+      authListener?.subscription?.unsubscribe()
     }
   }, [])
 

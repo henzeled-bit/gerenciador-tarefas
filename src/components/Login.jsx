@@ -17,24 +17,38 @@ export default function Login({ onSignIn }) {
       const hash = window.location.hash
       
       // Verificar se tem token de recovery na URL
-      if (hash.includes('type=recovery') && hash.includes('access_token=')) {
+      if (hash.includes('type=recovery')) {
         setModoResetSenha(true)
         
-        // Extrair tokens da URL
-        const params = new URLSearchParams(hash.substring(1).replace('type=recovery#', '').replace('type=recovery%23', ''))
+        // Limpar e processar o hash corretamente
+        let cleanHash = hash.substring(1) // Remove o # inicial
+        
+        // Substituir %23 por & para separar corretamente os parâmetros
+        cleanHash = cleanHash.replace('type=recovery%23', 'type=recovery&')
+        cleanHash = cleanHash.replace('type=recovery#', 'type=recovery&')
+        
+        const params = new URLSearchParams(cleanHash)
         const accessToken = params.get('access_token')
         const refreshToken = params.get('refresh_token')
         
-        if (accessToken) {
+        console.log('Access Token encontrado:', accessToken ? 'Sim' : 'Não')
+        
+        if (accessToken && refreshToken) {
           // Estabelecer sessão com o token
-          const { error } = await supabase.auth.setSession({
+          const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
-            refresh_token: refreshToken || ''
+            refresh_token: refreshToken
           })
           
           if (error) {
             console.error('Erro ao estabelecer sessão:', error)
+            setError('Erro ao processar link de recuperação: ' + error.message)
+          } else {
+            console.log('Sessão estabelecida com sucesso!')
           }
+        } else {
+          console.error('Tokens não encontrados na URL')
+          setError('Link de recuperação inválido')
         }
       }
     }

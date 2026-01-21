@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
-export default function ModalTarefa({ isOpen, onClose, tarefa, onSave }) {
+export default function ModalTarefa({ tarefa, mode, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     descricao: '',
     responsavel: '',
@@ -9,12 +9,14 @@ export default function ModalTarefa({ isOpen, onClose, tarefa, onSave }) {
     prazo_hora: '',
     priority: 'low',
     status: 'pendente'
-  });
-  const [responsaveis, setResponsaveis] = useState([]);
-  const [loading, setLoading] = useState(false);
+  })
+  const [loading, setLoading] = useState(false)
+  const [responsaveis, setResponsaveis] = useState([])
 
   useEffect(() => {
-    if (tarefa) {
+    loadResponsaveis()
+    
+    if (mode === 'edit' && tarefa) {
       setFormData({
         descricao: tarefa.descricao || '',
         responsavel: tarefa.responsavel || '',
@@ -22,226 +24,177 @@ export default function ModalTarefa({ isOpen, onClose, tarefa, onSave }) {
         prazo_hora: tarefa.prazo_hora || '',
         priority: tarefa.priority || 'low',
         status: tarefa.status || 'pendente'
-      });
-    } else {
-      setFormData({
-        descricao: '',
-        responsavel: '',
-        prazo_data: '',
-        prazo_hora: '',
-        priority: 'low',
-        status: 'pendente'
-      });
+      })
     }
-  }, [tarefa]);
+  }, [mode, tarefa])
 
-  useEffect(() => {
-    if (isOpen) {
-      carregarResponsaveis();
-    }
-  }, [isOpen]);
-
-  const carregarResponsaveis = async () => {
+  async function loadResponsaveis() {
     try {
-      const { data: profiles } = await supabase
+      // Buscar todos os perfis ativos
+      const { data, error } = await supabase
         .from('profiles')
-        .select('nome')
-        .order('nome');
-
-      if (profiles) {
-        const uniqueResponsaveis = [...new Set(profiles.map(p => p.nome))];
-        setResponsaveis(uniqueResponsaveis);
-      }
+        .select('id, nome')
+        .eq('ativo', true)
+        .order('nome')
+      
+      if (error) throw error
+      
+      setResponsaveis(data || [])
     } catch (error) {
-      console.error('Erro ao carregar responsáveis:', error);
+      console.error('Erro ao carregar responsáveis:', error)
     }
-  };
+  }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setLoading(true)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      const tarefaData = {
+      const dados = {
         ...formData,
-        prazo_hora: formData.prazo_hora || '23:59',
-        priority: formData.priority || 'low',
-        created_by: user.id
-      };
-
-      if (tarefa?.id) {
-        // Atualizar tarefa existente
-        const { error } = await supabase
-          .from('tarefas')
-          .update(tarefaData)
-          .eq('id', tarefa.id);
-
-        if (error) throw error;
-      } else {
-        // Criar nova tarefa
-        const { error } = await supabase
-          .from('tarefas')
-          .insert([tarefaData]);
-
-        if (error) throw error;
+        prazo_hora: formData.prazo_hora || null,
+        priority: formData.priority || 'low'
       }
 
-      onSave();
-      onClose();
+      if (mode === 'create') {
+        const { error } = await supabase
+          .from('tarefas')
+          .insert([dados])
+        
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('tarefas')
+          .update(dados)
+          .eq('id', tarefa.id)
+        
+        if (error) throw error
+      }
+
+      onSuccess()
     } catch (error) {
-      console.error('Erro ao salvar tarefa:', error);
-      alert('Erro ao salvar tarefa. Tente novamente.');
+      alert('Erro ao salvar tarefa: ' + error.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  if (!isOpen) return null;
+  }
 
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {tarefa ? 'Editar Tarefa' : 'Nova Tarefa'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-          >
-            ×
-          </button>
-        </div>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          {mode === 'create' ? 'Nova Tarefa' : 'Editar Tarefa'}
+        </h2>
 
-        {/* Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-4">
-            {/* Título */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Título <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="descricao"
-                value={formData.descricao}
-                onChange={handleChange}
-                placeholder="Ex: Revisar relatório mensal"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Descrição *
+            </label>
+            <textarea
+              value={formData.descricao}
+              onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows="3"
+              required
+            />
+          </div>
 
-            {/* Responsável */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Responsável <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="responsavel"
-                value={formData.responsavel}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Selecione um responsável</option>
-                {responsaveis.map((resp) => (
-                  <option key={resp} value={resp}>
-                    {resp}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Responsável *
+            </label>
+            <select
+              value={formData.responsavel}
+              onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
+              <option value="">Selecione um responsável</option>
+              {responsaveis.map((resp) => (
+                <option key={resp.id} value={resp.id}>
+                  {resp.nome}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {/* Data e Hora */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Data do Prazo <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="prazo_data"
-                  value={formData.prazo_data}
-                  onChange={handleChange}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Data do Prazo *
+            </label>
+            <input
+              type="date"
+              value={formData.prazo_data}
+              onChange={(e) => setFormData({ ...formData, prazo_data: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Hora do Prazo
-                </label>
-                <input
-                  type="time"
-                  name="prazo_hora"
-                  value={formData.prazo_hora}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Padrão: fim do dia (23:59)
-                </p>
-              </div>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Hora do Prazo (opcional)
+            </label>
+            <input
+              type="time"
+              value={formData.prazo_hora}
+              onChange={(e) => setFormData({ ...formData, prazo_hora: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Se não informar, considera-se fim do dia
+            </p>
+          </div>
 
-            {/* Prioridade */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Prioridade
-              </label>
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="low">🟢 Baixa (padrão)</option>
-                <option value="medium">🟡 Média</option>
-                <option value="high">🔴 Alta</option>
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Prioridade
+            </label>
+            <select
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="low">🟢 Baixa (padrão)</option>
+              <option value="medium">🟡 Média</option>
+              <option value="high">🔴 Alta</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Status
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="pendente">Pendente</option>
+              <option value="em_andamento">Em Andamento</option>
+              <option value="aguardando">Aguardando</option>
+            </select>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50"
+            >
+              {loading ? 'Salvando...' : 'Salvar'}
+            </button>
           </div>
         </form>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-            disabled={loading}
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
-            disabled={loading}
-          >
-            {loading ? 'Salvando...' : tarefa ? 'Atualizar' : 'Criar Tarefa'}
-          </button>
-        </div>
       </div>
     </div>
-  );
+  )
 }

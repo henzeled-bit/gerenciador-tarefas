@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { parseISO, isPast, isToday } from 'date-fns'
+import { parseISO, isPast, isToday, format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { enviarEmail, templateTarefaConcluida } from '../lib/emailService'
 
 export default function ModalConcluir({ tarefa, onClose, onSuccess }) {
   const [justificativa, setJustificativa] = useState('')
@@ -50,6 +52,45 @@ export default function ModalConcluir({ tarefa, onClose, onSuccess }) {
         .eq('id', tarefa.id)
 
       if (error) throw error
+
+      // Enviar email para o admin
+      try {
+        // Buscar todos os admins
+        const { data: admins } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+          .eq('ativo', true)
+
+        if (admins && admins.length > 0) {
+          const concluidaEm = format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+          const statusEmail = (atrasada && !naoEstaAtrasada) ? 'com_atraso' : 'no_prazo'
+
+          // Enviar email para cada admin
+          for (const admin of admins) {
+            const { data: { user } } = await supabase.auth.admin.getUserById(admin.id)
+            
+            if (user?.email) {
+              const htmlEmail = templateTarefaConcluida({
+                nomeResponsavel: tarefa.responsavel_nome,
+                descricao: tarefa.descricao,
+                concluidaEm: concluidaEm,
+                status: statusEmail,
+                justificativa: dados.justificativa || null
+              })
+
+              await enviarEmail({
+                to: user.email,
+                subject: `✅ Tarefa concluída por ${tarefa.responsavel_nome}`,
+                html: htmlEmail
+              })
+            }
+          }
+        }
+      } catch (emailError) {
+        console.error('Erro ao enviar email:', emailError)
+        // Não bloqueia a conclusão se o email falhar
+      }
 
       onSuccess()
     } catch (error) {

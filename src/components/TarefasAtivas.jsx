@@ -9,6 +9,24 @@ export default function TarefasAtivas({ tarefas, isAdmin, userId, onUpdate }) {
   const [modalTarefa, setModalTarefa] = useState(null)
   const [modalConcluir, setModalConcluir] = useState(null)
 
+  function getPrioridadeInfo(priority) {
+    const prioridades = {
+      high: { emoji: '🔴', texto: 'Alta', cor: 'bg-red-50 border-red-200' },
+      medium: { emoji: '🟡', texto: 'Média', cor: 'bg-yellow-50 border-yellow-200' },
+      low: { emoji: '🟢', texto: 'Baixa', cor: '' }
+    }
+    return prioridades[priority] || prioridades.low
+  }
+
+  function ordenarTarefas(tarefas) {
+    const ordem = { high: 1, medium: 2, low: 3 }
+    return [...tarefas].sort((a, b) => {
+      const prioA = ordem[a.priority] || 3
+      const prioB = ordem[b.priority] || 3
+      return prioA - prioB
+    })
+  }
+
   function calcularAtraso(tarefa) {
     if (!tarefa.prazo_data) return false
     
@@ -68,21 +86,27 @@ export default function TarefasAtivas({ tarefas, isAdmin, userId, onUpdate }) {
         </div>
       ) : (
         <div className="grid gap-4">
-          {tarefas.map((tarefa) => {
+          {ordenarTarefas(tarefas).map((tarefa) => {
             const atrasada = calcularAtraso(tarefa)
+            const prioridadeInfo = getPrioridadeInfo(tarefa.priority)
             
             return (
               <div
                 key={tarefa.id}
                 className={`bg-white rounded-lg shadow p-6 ${
                   atrasada ? 'border-l-4 border-red-500' : ''
-                }`}
+                } ${prioridadeInfo.cor ? `border-l-4 ${prioridadeInfo.cor}` : ''}`}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {tarefa.descricao}
-                    </h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {tarefa.descricao}
+                      </h3>
+                      <span className="text-sm">
+                        {prioridadeInfo.emoji}
+                      </span>
+                    </div>
                     <div className="space-y-1 text-sm text-gray-600">
                       <p>
                         <span className="font-medium">Responsável:</span> {tarefa.responsavel_nome}

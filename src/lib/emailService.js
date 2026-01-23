@@ -1,18 +1,13 @@
-// Serviço para envio de emails via Resend
-const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY
-const RESEND_API_URL = 'https://api.resend.com/emails'
-
+// Serviço para envio de emails via API do Vercel
 export async function enviarEmail({ to, subject, html }) {
   try {
-    const response = await fetch(RESEND_API_URL, {
+    const response = await fetch('/api/send-email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`
       },
       body: JSON.stringify({
-        from: 'Gerenciador de Tarefas <onboarding@resend.dev>',
-        to: [to],
+        to: to,
         subject: subject,
         html: html
       })
@@ -21,7 +16,7 @@ export async function enviarEmail({ to, subject, html }) {
     const data = await response.json()
     
     if (!response.ok) {
-      throw new Error(data.message || 'Erro ao enviar email')
+      throw new Error(data.error || 'Erro ao enviar email')
     }
 
     console.log('Email enviado com sucesso:', data)

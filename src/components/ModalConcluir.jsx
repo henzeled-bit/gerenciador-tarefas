@@ -1,184 +1,219 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { parseISO, isPast, isToday, format } from 'date-fns'
+import { enviarEmail, templateNovaTarefa } from '../lib/emailService'
+import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { enviarEmail, templateTarefaConcluida } from '../lib/emailService'
 
-export default function ModalConcluir({ tarefa, onClose, onSuccess }) {
-  const [justificativa, setJustificativa] = useState('')
-  const [naoEstaAtrasada, setNaoEstaAtrasada] = useState(false)
+export default function ModalTarefa({ tarefa, mode, onClose, onSuccess }) {
+  const [formData, setFormData] = useState({
+    descricao: '',
+    responsavel: '',
+    prazo_data: '',
+    prazo_hora: '',
+    status: 'pendente'
+  })
   const [loading, setLoading] = useState(false)
+  const [responsaveis, setResponsaveis] = useState([])
 
-  function calcularAtraso() {
-    if (!tarefa.prazo_data) return false
+  useEffect(() => {
+    loadResponsaveis()
     
-    const prazoDate = parseISO(tarefa.prazo_data)
-    
-    if (tarefa.prazo_hora) {
-      const [hora, minuto] = tarefa.prazo_hora.split(':')
-      prazoDate.setHours(parseInt(hora), parseInt(minuto))
-    } else {
-      prazoDate.setHours(23, 59, 59)
+    if (mode === 'edit' && tarefa) {
+      setFormData({
+        descricao: tarefa.descricao || '',
+        responsavel: tarefa.responsavel || '',
+        prazo_data: tarefa.prazo_data || '',
+        prazo_hora: tarefa.prazo_hora || '',
+        status: tarefa.status || 'pendente'
+      })
     }
-    
-    return isPast(prazoDate) && !isToday(prazoDate)
+  }, [mode, tarefa])
+
+  async function loadResponsaveis() {
+    try {
+      // Buscar todos os perfis ativos
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .eq('ativo', true)
+        .order('nome')
+      
+      if (error) throw error
+      
+      setResponsaveis(data || [])
+    } catch (error) {
+      console.error('Erro ao carregar responsáveis:', error)
+    }
   }
 
-  const atrasada = calcularAtraso()
-
-  async function handleConcluir() {
-    if (atrasada && !justificativa && !naoEstaAtrasada) {
-      alert('Por favor, forneça uma justificativa ou marque que não estava atrasada')
-      return
-    }
-
+  async function handleSubmit(e) {
+    e.preventDefault()
     setLoading(true)
 
     try {
       const dados = {
-        status: 'concluido',
-        concluido_em: new Date().toISOString(),
+        ...formData,
+        prazo_hora: formData.prazo_hora || null,
+        priority: formData.priority || 'low'
       }
 
-      if (atrasada && justificativa) {
-        dados.justificativa = justificativa
-      } else if (naoEstaAtrasada) {
-        dados.justificativa = 'Usuário informou que não estava atrasada'
-      }
+      if (mode === 'create') {
+        const { error } = await supabase
+          .from('tarefas')
+          .insert([dados])
+        
+        if (error) throw error
 
-      const { error } = await supabase
-        .from('tarefas')
-        .update(dados)
-        .eq('id', tarefa.id)
+        // Enviar email para o responsável
+        try {
+          // Buscar dados do responsável (nome e email)
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('nome, email')
+            .eq('id', formData.responsavel)
+            .single()
+          
+          if (profileData && profileData.email) {
+            const prazoFormatado = formData.prazo_hora 
+              ? `${format(new Date(formData.prazo_data), "dd/MM/yyyy", { locale: ptBR })} às ${formData.prazo_hora}`
+              : `${format(new Date(formData.prazo_data), "dd/MM/yyyy", { locale: ptBR })} (fim do dia)`
 
-      if (error) throw error
+            const htmlEmail = templateNovaTarefa({
+              nomeResponsavel: profileData.nome,
+              descricao: formData.descricao,
+              prazo: prazoFormatado,
+              prioridade: formData.priority
+            })
 
-      // Enviar email para o admin
-      try {
-        // Buscar todos os admins com email
-        const { data: admins } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .eq('role', 'admin')
-          .eq('ativo', true)
-
-        if (admins && admins.length > 0) {
-          const concluidaEm = format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
-          const statusEmail = (atrasada && !naoEstaAtrasada) ? 'com_atraso' : 'no_prazo'
-
-          // Enviar email para cada admin
-          for (const admin of admins) {
-            if (admin.email) {
-              const htmlEmail = templateTarefaConcluida({
-                nomeResponsavel: tarefa.responsavel_nome,
-                descricao: tarefa.descricao,
-                concluidaEm: concluidaEm,
-                status: statusEmail,
-                justificativa: dados.justificativa || null
-              })
-
-              await enviarEmail({
-                to: admin.email,
-                subject: `✅ Tarefa concluída por ${tarefa.responsavel_nome}`,
-                html: htmlEmail
-              })
-            }
+            await enviarEmail({
+              to: profileData.email,
+              subject: '📋 Nova tarefa atribuída a você',
+              html: htmlEmail
+            })
           }
+        } catch (emailError) {
+          console.error('Erro ao enviar email:', emailError)
+          // Não bloqueia a criação da tarefa se o email falhar
         }
-      } catch (emailError) {
-        console.error('Erro ao enviar email:', emailError)
-        // Não bloqueia a conclusão se o email falhar
+      } else {
+        const { error } = await supabase
+          .from('tarefas')
+          .update(dados)
+          .eq('id', tarefa.id)
+        
+        if (error) throw error
       }
 
       onSuccess()
     } catch (error) {
-      alert('Erro ao concluir tarefa: ' + error.message)
+      alert('Erro ao salvar tarefa: ' + error.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Concluir Tarefa
-        </h2>
-
-        <div className="mb-6">
-          <p className="text-gray-700 mb-2">
-            <span className="font-medium">Descrição:</span> {tarefa.descricao}
-          </p>
-          <p className="text-gray-700">
-            <span className="font-medium">Responsável:</span> {tarefa.responsavel_nome}
-          </p>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full my-8">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">
+            {mode === 'create' ? 'Nova Tarefa' : 'Editar Tarefa'}
+          </h2>
         </div>
 
-        {atrasada && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700">
-                  Esta tarefa está atrasada. Por favor, forneça uma justificativa ou indique se não estava realmente atrasada.
-                </p>
-              </div>
-            </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Descrição *
+            </label>
+            <textarea
+              value={formData.descricao}
+              onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows="2"
+              required
+            />
           </div>
-        )}
 
-        {atrasada && (
-          <>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Justificativa
-              </label>
-              <textarea
-                value={justificativa}
-                onChange={(e) => setJustificativa(e.target.value)}
-                disabled={naoEstaAtrasada}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                rows="3"
-                placeholder="Explique o motivo do atraso..."
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Responsável *
+            </label>
+            <select
+              value={formData.responsavel}
+              onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
+              <option value="">Selecione um responsável</option>
+              {responsaveis.map((resp) => (
+                <option key={resp.id} value={resp.id}>
+                  {resp.nome}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div className="mb-6">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={naoEstaAtrasada}
-                  onChange={(e) => setNaoEstaAtrasada(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="ml-2 text-sm text-gray-700">
-                  Esta tarefa não estava atrasada (esqueci de marcar como concluída)
-                </span>
-              </label>
-            </div>
-          </>
-        )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Data do Prazo *
+            </label>
+            <input
+              type="date"
+              value={formData.prazo_data}
+              onChange={(e) => setFormData({ ...formData, prazo_data: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
 
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleConcluir}
-            disabled={loading}
-            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium disabled:opacity-50"
-          >
-            {loading ? 'Concluindo...' : 'Concluir'}
-          </button>
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Hora do Prazo (opcional)
+            </label>
+            <input
+              type="time"
+              value={formData.prazo_hora}
+              onChange={(e) => setFormData({ ...formData, prazo_hora: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Se não informar, considera-se fim do dia
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Status
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="pendente">Pendente</option>
+              <option value="em_andamento">Em Andamento</option>
+              <option value="aguardando">Aguardando</option>
+            </select>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50"
+            >
+              {loading ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

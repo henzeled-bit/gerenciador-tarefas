@@ -69,14 +69,11 @@ export default function ModalTarefa({ tarefa, mode, onClose, onSuccess }) {
           // Buscar dados do responsável (nome e email)
           const { data: profileData } = await supabase
             .from('profiles')
-            .select('nome')
+            .select('nome, email')
             .eq('id', formData.responsavel)
             .single()
-
-          // Buscar email do auth.users
-          const { data: { user } } = await supabase.auth.admin.getUserById(formData.responsavel)
           
-          if (profileData && user?.email) {
+          if (profileData && profileData.email) {
             const prazoFormatado = formData.prazo_hora 
               ? `${format(new Date(formData.prazo_data), "dd/MM/yyyy", { locale: ptBR })} às ${formData.prazo_hora}`
               : `${format(new Date(formData.prazo_data), "dd/MM/yyyy", { locale: ptBR })} (fim do dia)`
@@ -89,7 +86,7 @@ export default function ModalTarefa({ tarefa, mode, onClose, onSuccess }) {
             })
 
             await enviarEmail({
-              to: user.email,
+              to: profileData.email,
               subject: '📋 Nova tarefa atribuída a você',
               html: htmlEmail
             })

@@ -55,10 +55,10 @@ export default function ModalConcluir({ tarefa, onClose, onSuccess }) {
 
       // Enviar email para o admin
       try {
-        // Buscar todos os admins
+        // Buscar todos os admins com email
         const { data: admins } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, email')
           .eq('role', 'admin')
           .eq('ativo', true)
 
@@ -68,9 +68,7 @@ export default function ModalConcluir({ tarefa, onClose, onSuccess }) {
 
           // Enviar email para cada admin
           for (const admin of admins) {
-            const { data: { user } } = await supabase.auth.admin.getUserById(admin.id)
-            
-            if (user?.email) {
+            if (admin.email) {
               const htmlEmail = templateTarefaConcluida({
                 nomeResponsavel: tarefa.responsavel_nome,
                 descricao: tarefa.descricao,
@@ -80,7 +78,7 @@ export default function ModalConcluir({ tarefa, onClose, onSuccess }) {
               })
 
               await enviarEmail({
-                to: user.email,
+                to: admin.email,
                 subject: `✅ Tarefa concluída por ${tarefa.responsavel_nome}`,
                 html: htmlEmail
               })

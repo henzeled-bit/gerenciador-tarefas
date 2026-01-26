@@ -171,15 +171,17 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
       return 'Concluída'
     }
 
-    const prazoDate = new Date(tarefa.prazo_data)
+    const prazoDate = parseISO(tarefa.prazo_data)
     if (tarefa.prazo_hora) {
       const [hora, minuto] = tarefa.prazo_hora.split(':')
-      prazoDate.setHours(parseInt(hora), parseInt(minuto))
+      prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
     } else {
-      prazoDate.setHours(23, 59, 59)
+      prazoDate.setHours(23, 59, 59, 999)
     }
 
-    const concluidoDate = new Date(tarefa.concluido_em)
+    // Converter formato do Supabase para ISO com UTC
+    const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + (tarefa.concluido_em.includes('Z') ? '' : 'Z')
+    const concluidoDate = parseISO(concluidoISO)
 
     if (concluidoDate <= prazoDate) {
       return 'Concluída no prazo'
@@ -195,6 +197,22 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     return 'Concluída com atraso'
   }
 
+  function formatarDataExcel(data) {
+    if (!data || data === '-') return '-'
+    // Converter formato do Supabase para exibição
+    const dataISO = data.replace(' ', 'T') + (data.includes('Z') || data.includes('+') ? '' : 'Z')
+    const date = new Date(dataISO)
+    // Formatar para timezone local do Brasil
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'America/Sao_Paulo'
+    })
+  }
+
   function exportarExcel() {
     // Preparar dados
     const dadosExport = tarefas.map(t => ({
@@ -202,9 +220,10 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
       'Responsável': t.responsavel_nome || t.responsavel,
       'Data Prazo': t.prazo_data || '-',
       'Hora Prazo': t.prazo_hora || '-',
+      'Prioridade': t.priority === 'high' ? 'Alta' : t.priority === 'medium' ? 'Média' : 'Baixa',
       'Status': calcularStatusDetalhado(t),
-      'Criada em': t.created_at,
-      'Concluída em': t.concluido_em || '-',
+      'Criada em': formatarDataExcel(t.created_at),
+      'Concluída em': t.concluido_em ? formatarDataExcel(t.concluido_em) : '-',
       'Justificativa': t.justificativa || '-'
     }))
 

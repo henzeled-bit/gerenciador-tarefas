@@ -36,7 +36,9 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
       prazoDate.setHours(23, 59, 59, 999)
     }
 
-    const concluidoDate = parseISO(tarefa.concluido_em)
+    // Converter formato do Supabase para ISO com UTC (mesmo fix do formatarData)
+    const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
+    const concluidoDate = parseISO(concluidoISO)
 
     // Concluída no prazo
     if (concluidoDate <= prazoDate) {

@@ -29,11 +29,14 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           const prazoDate = parseISO(tarefa.prazo_data)
           if (tarefa.prazo_hora) {
             const [hora, minuto] = tarefa.prazo_hora.split(':')
-            prazoDate.setHours(parseInt(hora), parseInt(minuto))
+            prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
           } else {
-            prazoDate.setHours(23, 59, 59)
+            prazoDate.setHours(23, 59, 59, 999)
           }
-          const concluidoDate = parseISO(tarefa.concluido_em)
+          
+          // Converter formato do Supabase para ISO com UTC
+          const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
+          const concluidoDate = parseISO(concluidoISO)
           
           if (concluidoDate <= prazoDate) {
             noPrazo++
@@ -102,11 +105,14 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           const prazoDate = parseISO(tarefa.prazo_data)
           if (tarefa.prazo_hora) {
             const [hora, minuto] = tarefa.prazo_hora.split(':')
-            prazoDate.setHours(parseInt(hora), parseInt(minuto))
+            prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
           } else {
-            prazoDate.setHours(23, 59, 59)
+            prazoDate.setHours(23, 59, 59, 999)
           }
-          const concluidoDate = parseISO(tarefa.concluido_em)
+          
+          // Converter formato do Supabase para ISO com UTC
+          const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
+          const concluidoDate = parseISO(concluidoISO)
           
           if (concluidoDate <= prazoDate) {
             resp.noPrazo++

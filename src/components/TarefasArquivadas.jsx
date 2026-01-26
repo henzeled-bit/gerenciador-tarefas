@@ -8,9 +8,9 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
 
   function formatarData(data) {
     if (!data) return '-'
-    // parseISO já converte para o timezone local do navegador automaticamente
-    const dataLocal = new Date(data)
-    return format(dataLocal, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    // Adicionar 'Z' para indicar que é UTC, depois parseISO converte para local
+    const dataComZ = data.endsWith('Z') ? data : data + 'Z'
+    return format(parseISO(dataComZ), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
   }
 
   function calcularStatusDetalhado(tarefa) {

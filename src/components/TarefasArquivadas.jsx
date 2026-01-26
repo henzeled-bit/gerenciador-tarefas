@@ -1,5 +1,4 @@
 import { format, parseISO } from 'date-fns'
-import { toZonedTime } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import { supabase } from '../lib/supabase'
 import { useState } from 'react'
@@ -9,9 +8,8 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
 
   function formatarData(data) {
     if (!data) return '-'
-    // Converter de UTC para timezone local do Brasil
-    const dataUTC = parseISO(data)
-    const dataLocal = toZonedTime(dataUTC, 'America/Sao_Paulo')
+    // parseISO já converte para o timezone local do navegador automaticamente
+    const dataLocal = new Date(data)
     return format(dataLocal, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
   }
 

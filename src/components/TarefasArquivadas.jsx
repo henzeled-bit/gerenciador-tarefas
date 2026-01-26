@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns'
+import { toZonedTime } from 'date-fns-tz'
 import { ptBR } from 'date-fns/locale'
 import { supabase } from '../lib/supabase'
 import { useState } from 'react'
@@ -8,7 +9,10 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
 
   function formatarData(data) {
     if (!data) return '-'
-    return format(parseISO(data), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    // Converter de UTC para timezone local do Brasil
+    const dataUTC = parseISO(data)
+    const dataLocal = toZonedTime(dataUTC, 'America/Sao_Paulo')
+    return format(dataLocal, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
   }
 
   function calcularStatusDetalhado(tarefa) {
@@ -16,15 +20,15 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
       return { status: 'Concluída', cor: 'green' }
     }
 
-    const prazoDate = new Date(tarefa.prazo_data)
+    const prazoDate = parseISO(tarefa.prazo_data)
     if (tarefa.prazo_hora) {
       const [hora, minuto] = tarefa.prazo_hora.split(':')
-      prazoDate.setHours(parseInt(hora), parseInt(minuto))
+      prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
     } else {
-      prazoDate.setHours(23, 59, 59)
+      prazoDate.setHours(23, 59, 59, 999)
     }
 
-    const concluidoDate = new Date(tarefa.concluido_em)
+    const concluidoDate = parseISO(tarefa.concluido_em)
 
     // Concluída no prazo
     if (concluidoDate <= prazoDate) {
@@ -40,6 +44,15 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
     }
 
     return { status: 'Concluída com atraso', cor: 'red' }
+  }
+
+  function getPrioridadeInfo(priority) {
+    const prioridades = {
+      high: { emoji: '🔴', texto: 'Alta' },
+      medium: { emoji: '🟡', texto: 'Média' },
+      low: { emoji: '🟢', texto: 'Baixa' }
+    }
+    return prioridades[priority] || prioridades.low
   }
 
   async function handleDesarquivar(tarefaId) {
@@ -78,6 +91,7 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
         <div className="grid gap-4">
           {tarefas.map((tarefa) => {
             const statusInfo = calcularStatusDetalhado(tarefa)
+            const prioridadeInfo = getPrioridadeInfo(tarefa.priority)
             const corBadge = statusInfo.cor === 'green' 
               ? 'bg-green-100 text-green-800'
               : statusInfo.cor === 'yellow'
@@ -95,6 +109,9 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
                       <h3 className="text-lg font-semibold text-gray-900">
                         {tarefa.descricao}
                       </h3>
+                      <span className="text-sm">
+                        {prioridadeInfo.emoji}
+                      </span>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${corBadge}`}>
                         {statusInfo.status}
                       </span>

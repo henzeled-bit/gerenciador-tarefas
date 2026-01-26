@@ -8,9 +8,19 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
 
   function formatarData(data) {
     if (!data) return '-'
-    // Adicionar 'Z' para indicar que é UTC, depois parseISO converte para local
-    const dataComZ = data.endsWith('Z') ? data : data + 'Z'
-    return format(parseISO(dataComZ), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    // Converter formato do Supabase (YYYY-MM-DD HH:MM:SS) para ISO com UTC
+    // Trocar espaço por 'T' e adicionar 'Z' para indicar UTC
+    const dataISO = data.replace(' ', 'T') + 'Z'
+    const date = new Date(dataISO)
+    // Formatar para timezone do Brasil
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'America/Sao_Paulo'
+    }).replace(',', ' às')
   }
 
   function calcularStatusDetalhado(tarefa) {

@@ -13,14 +13,23 @@ export default function TarefasAtivas({ tarefas, isAdmin, userId, onUpdate }) {
     const prioridades = {
       high: { emoji: '🔴', texto: 'Alta', cor: 'bg-red-50 border-red-200' },
       medium: { emoji: '🟡', texto: 'Média', cor: 'bg-yellow-50 border-yellow-200' },
-      low: { emoji: '🟢', texto: 'Baixa', cor: '' }
+      low: { emoji: '🟢', texto: 'Baixa', cor: 'bg-green-50 border-green-200' }
     }
     return prioridades[priority] || prioridades.low
   }
 
   function ordenarTarefas(tarefas) {
-    const ordem = { high: 1, medium: 2, low: 3 }
     return [...tarefas].sort((a, b) => {
+      // Primeiro ordena por data de prazo (mais próxima primeiro)
+      const dataA = a.prazo_data ? new Date(a.prazo_data + (a.prazo_hora ? `T${a.prazo_hora}` : 'T23:59:59')) : new Date('9999-12-31')
+      const dataB = b.prazo_data ? new Date(b.prazo_data + (b.prazo_hora ? `T${b.prazo_hora}` : 'T23:59:59')) : new Date('9999-12-31')
+      
+      if (dataA.getTime() !== dataB.getTime()) {
+        return dataA - dataB
+      }
+      
+      // Se tiver mesma data, ordena por prioridade
+      const ordem = { high: 1, medium: 2, low: 3 }
       const prioA = ordem[a.priority] || 3
       const prioB = ordem[b.priority] || 3
       return prioA - prioB

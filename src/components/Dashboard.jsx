@@ -10,6 +10,7 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
   const [tarefas, setTarefas] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalTrocarSenha, setModalTrocarSenha] = useState(false)
+  const [filtroResponsavel, setFiltroResponsavel] = useState('todos')
 
   useEffect(() => {
     loadTarefas()
@@ -45,6 +46,22 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
   const tarefasAtivas = tarefas.filter(t => t.status !== 'concluido')
   const tarefasArquivadas = tarefas.filter(t => t.status === 'concluido')
 
+  // Aplicar filtro de responsável
+  const tarefasAtivasFiltradas = filtroResponsavel === 'todos' 
+    ? tarefasAtivas 
+    : filtroResponsavel === 'minhas'
+    ? tarefasAtivas.filter(t => t.responsavel === user.id)
+    : tarefasAtivas.filter(t => t.responsavel === filtroResponsavel)
+
+  const tarefasArquivadasFiltradas = filtroResponsavel === 'todos' 
+    ? tarefasArquivadas 
+    : filtroResponsavel === 'minhas'
+    ? tarefasArquivadas.filter(t => t.responsavel === user.id)
+    : tarefasArquivadas.filter(t => t.responsavel === filtroResponsavel)
+
+  // Obter lista de responsáveis únicos
+  const responsaveisUnicos = [...new Map(tarefas.map(t => [t.responsavel, t.responsavel_nome])).entries()]
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -77,6 +94,36 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
         </div>
       </header>
 
+      {/* Filtro para Admin */}
+      {isAdmin && activeTab !== 'admin' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium text-gray-700">
+                Filtrar tarefas:
+              </label>
+              <select
+                value={filtroResponsavel}
+                onChange={(e) => setFiltroResponsavel(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="todos">Todas as tarefas</option>
+                <option value="minhas">Minhas tarefas</option>
+                {responsaveisUnicos.map(([id, nome]) => (
+                  <option key={id} value={id}>{nome}</option>
+                ))}
+              </select>
+              <span className="text-sm text-gray-500">
+                ({filtroResponsavel === 'todos' ? tarefasAtivas.length + tarefasArquivadas.length : 
+                  filtroResponsavel === 'minhas' ? tarefasAtivas.filter(t => t.responsavel === user.id).length + tarefasArquivadas.filter(t => t.responsavel === user.id).length :
+                  tarefasAtivas.filter(t => t.responsavel === filtroResponsavel).length + tarefasArquivadas.filter(t => t.responsavel === filtroResponsavel).length
+                } tarefas)
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="border-b border-gray-200">
@@ -89,7 +136,7 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Tarefas Ativas ({tarefasAtivas.length})
+              Tarefas Ativas ({tarefasAtivasFiltradas.length})
             </button>
             <button
               onClick={() => setActiveTab('arquivadas')}
@@ -99,7 +146,7 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Arquivadas ({tarefasArquivadas.length})
+              Arquivadas ({tarefasArquivadasFiltradas.length})
             </button>
             {isAdmin && (
               <button
@@ -128,7 +175,7 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
           <>
             {activeTab === 'ativas' && (
               <TarefasAtivas
-                tarefas={tarefasAtivas}
+                tarefas={tarefasAtivasFiltradas}
                 isAdmin={isAdmin}
                 userId={user.id}
                 onUpdate={loadTarefas}
@@ -136,7 +183,7 @@ export default function Dashboard({ user, profile, isAdmin, onSignOut }) {
             )}
             {activeTab === 'arquivadas' && (
               <TarefasArquivadas
-                tarefas={tarefasArquivadas}
+                tarefas={tarefasArquivadasFiltradas}
                 isAdmin={isAdmin}
                 onUpdate={loadTarefas}
               />

@@ -38,7 +38,8 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
           const concluidoDate = parseISO(concluidoISO)
           
-          if (concluidoDate <= prazoDate) {
+          // Verificar se foi no prazo OU se tem justificativa dizendo que não estava atrasada
+          if (concluidoDate <= prazoDate || tarefa.justificativa === 'Usuário informou que não estava atrasada') {
             noPrazo++
           } else {
             atrasadas++
@@ -114,7 +115,8 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
           const concluidoDate = parseISO(concluidoISO)
           
-          if (concluidoDate <= prazoDate) {
+          // Verificar se foi no prazo OU se tem justificativa dizendo que não estava atrasada
+          if (concluidoDate <= prazoDate || tarefa.justificativa === 'Usuário informou que não estava atrasada') {
             resp.noPrazo++
           } else {
             resp.atrasadas++

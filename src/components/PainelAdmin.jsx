@@ -42,13 +42,6 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
       resultado = resultado.filter(t => t.responsavel === filtroResponsavel)
     }
     const agora = new Date()
-  // Filtrar tarefas
-  const tarefasFiltradas = useMemo(() => {
-    let resultado = tarefas
-    if (filtroResponsavel !== 'todos') {
-      resultado = resultado.filter(t => t.responsavel === filtroResponsavel)
-    }
-    const agora = new Date()
     if (filtroMesAno !== 'todos') {
       const [ano, mes] = filtroMesAno.split('-')
       resultado = resultado.filter(t => {
@@ -138,6 +131,30 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     }
     return resultado
   }, [tarefas, filtroResponsavel, filtroPeriodo, filtroMesAno])
+
+  function handlePeriodoChange(valor) {
+    setFiltroPeriodo(valor)
+    if (valor !== 'customizado') setFiltroMesAno('todos')
+  }
+
+  function handleMesAnoChange(valor) {
+    setFiltroMesAno(valor)
+    setFiltroPeriodo(valor !== 'todos' ? 'customizado' : 'todos')
+  }
+
+  // Calcular estatísticas
+  const stats = useMemo(() => {
+    const total = tarefasFiltradas.length
+    const concluidas = tarefasFiltradas.filter(t => t.status === 'concluido').length
+    const ativas = total - concluidas
+    let noPrazo = 0
+    let atrasadas = 0
+    tarefasFiltradas.forEach(tarefa => {
+      if (tarefa.status === 'concluido') {
+        if (tarefa.prazo_data && tarefa.concluido_em) {
+          const prazoDate = parseISO(tarefa.prazo_data)
+          if (tarefa.prazo_hora) {
+            const [hora, minuto] = tarefa.prazo_hora.split(':')
             prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
           } else {
             prazoDate.setHours(23, 59, 59, 999)

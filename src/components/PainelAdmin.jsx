@@ -42,85 +42,102 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
       resultado = resultado.filter(t => t.responsavel === filtroResponsavel)
     }
     const agora = new Date()
+  // Filtrar tarefas
+  const tarefasFiltradas = useMemo(() => {
+    let resultado = tarefas
+    if (filtroResponsavel !== 'todos') {
+      resultado = resultado.filter(t => t.responsavel === filtroResponsavel)
+    }
+    const agora = new Date()
     if (filtroMesAno !== 'todos') {
       const [ano, mes] = filtroMesAno.split('-')
       resultado = resultado.filter(t => {
-        const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
-        const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
-        return (dataCriacao && dataCriacao.getFullYear() === parseInt(ano) && dataCriacao.getMonth() === parseInt(mes) - 1) ||
-               (dataConclusao && dataConclusao.getFullYear() === parseInt(ano) && dataConclusao.getMonth() === parseInt(mes) - 1)
+        // Para tarefas concluídas: usar data de conclusão
+        if (t.status === 'concluido' && t.concluido_em) {
+          const dataConclusao = new Date(t.concluido_em.replace(' ', 'T') + 'Z')
+          return dataConclusao.getFullYear() === parseInt(ano) && dataConclusao.getMonth() === parseInt(mes) - 1
+        }
+        // Para tarefas ativas: usar data de prazo
+        if (t.status !== 'concluido' && t.prazo_data) {
+          const dataPrazo = new Date(t.prazo_data + 'T00:00:00')
+          return dataPrazo.getFullYear() === parseInt(ano) && dataPrazo.getMonth() === parseInt(mes) - 1
+        }
+        return false
       })
     } else if (filtroPeriodo !== 'todos') {
       switch(filtroPeriodo) {
         case 'este_mes':
           resultado = resultado.filter(t => {
-            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
-            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
-            return (dataCriacao && dataCriacao.getMonth() === agora.getMonth() && dataCriacao.getFullYear() === agora.getFullYear()) ||
-                   (dataConclusao && dataConclusao.getMonth() === agora.getMonth() && dataConclusao.getFullYear() === agora.getFullYear())
+            if (t.status === 'concluido' && t.concluido_em) {
+              const data = new Date(t.concluido_em.replace(' ', 'T') + 'Z')
+              return data.getMonth() === agora.getMonth() && data.getFullYear() === agora.getFullYear()
+            }
+            if (t.status !== 'concluido' && t.prazo_data) {
+              const data = new Date(t.prazo_data + 'T00:00:00')
+              return data.getMonth() === agora.getMonth() && data.getFullYear() === agora.getFullYear()
+            }
+            return false
           })
           break
         case 'mes_passado':
           const mesPassado = new Date(agora.getFullYear(), agora.getMonth() - 1, 1)
           resultado = resultado.filter(t => {
-            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
-            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
-            return (dataCriacao && dataCriacao.getMonth() === mesPassado.getMonth() && dataCriacao.getFullYear() === mesPassado.getFullYear()) ||
-                   (dataConclusao && dataConclusao.getMonth() === mesPassado.getMonth() && dataConclusao.getFullYear() === mesPassado.getFullYear())
+            if (t.status === 'concluido' && t.concluido_em) {
+              const data = new Date(t.concluido_em.replace(' ', 'T') + 'Z')
+              return data.getMonth() === mesPassado.getMonth() && data.getFullYear() === mesPassado.getFullYear()
+            }
+            if (t.status !== 'concluido' && t.prazo_data) {
+              const data = new Date(t.prazo_data + 'T00:00:00')
+              return data.getMonth() === mesPassado.getMonth() && data.getFullYear() === mesPassado.getFullYear()
+            }
+            return false
           })
           break
         case 'ultimos_3':
           const tres = new Date(agora.getFullYear(), agora.getMonth() - 3, 1)
           resultado = resultado.filter(t => {
-            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
-            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
-            return (dataCriacao && dataCriacao >= tres) || (dataConclusao && dataConclusao >= tres)
+            if (t.status === 'concluido' && t.concluido_em) {
+              const data = new Date(t.concluido_em.replace(' ', 'T') + 'Z')
+              return data >= tres
+            }
+            if (t.status !== 'concluido' && t.prazo_data) {
+              const data = new Date(t.prazo_data + 'T00:00:00')
+              return data >= tres
+            }
+            return false
           })
           break
         case 'ultimos_6':
           const seis = new Date(agora.getFullYear(), agora.getMonth() - 6, 1)
           resultado = resultado.filter(t => {
-            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
-            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
-            return (dataCriacao && dataCriacao >= seis) || (dataConclusao && dataConclusao >= seis)
+            if (t.status === 'concluido' && t.concluido_em) {
+              const data = new Date(t.concluido_em.replace(' ', 'T') + 'Z')
+              return data >= seis
+            }
+            if (t.status !== 'concluido' && t.prazo_data) {
+              const data = new Date(t.prazo_data + 'T00:00:00')
+              return data >= seis
+            }
+            return false
           })
           break
         case 'este_ano':
           resultado = resultado.filter(t => {
-            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
-            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
-            return (dataCriacao && dataCriacao.getFullYear() === agora.getFullYear()) ||
-                   (dataConclusao && dataConclusao.getFullYear() === agora.getFullYear())
+            if (t.status === 'concluido' && t.concluido_em) {
+              const data = new Date(t.concluido_em.replace(' ', 'T') + 'Z')
+              return data.getFullYear() === agora.getFullYear()
+            }
+            if (t.status !== 'concluido' && t.prazo_data) {
+              const data = new Date(t.prazo_data + 'T00:00:00')
+              return data.getFullYear() === agora.getFullYear()
+            }
+            return false
           })
           break
       }
     }
     return resultado
   }, [tarefas, filtroResponsavel, filtroPeriodo, filtroMesAno])
-
-  function handlePeriodoChange(valor) {
-    setFiltroPeriodo(valor)
-    if (valor !== 'customizado') setFiltroMesAno('todos')
-  }
-
-  function handleMesAnoChange(valor) {
-    setFiltroMesAno(valor)
-    setFiltroPeriodo(valor !== 'todos' ? 'customizado' : 'todos')
-  }
-
-  // Calcular estatísticas
-  const stats = useMemo(() => {
-    const total = tarefasFiltradas.length
-    const concluidas = tarefasFiltradas.filter(t => t.status === 'concluido').length
-    const ativas = total - concluidas
-    let noPrazo = 0
-    let atrasadas = 0
-    tarefasFiltradas.forEach(tarefa => {
-      if (tarefa.status === 'concluido') {
-        if (tarefa.prazo_data && tarefa.concluido_em) {
-          const prazoDate = parseISO(tarefa.prazo_data)
-          if (tarefa.prazo_hora) {
-            const [hora, minuto] = tarefa.prazo_hora.split(':')
             prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
           } else {
             prazoDate.setHours(23, 59, 59, 999)

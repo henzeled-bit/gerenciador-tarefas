@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import * as XLSX from 'xlsx'
 import { parseISO, isPast, isToday } from 'date-fns'
 
@@ -7,24 +7,116 @@ const COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b']
 
 export default function PainelAdmin({ tarefas, onUpdate }) {
   const [filtroResponsavel, setFiltroResponsavel] = useState('todos')
+  const [filtroPeriodo, setFiltroPeriodo] = useState('todos')
+  const [filtroMesAno, setFiltroMesAno] = useState('todos')
+
+  // Obter meses disponíveis
+  const mesesDisponiveis = useMemo(() => {
+    const meses = new Set()
+    tarefas.forEach(tarefa => {
+      if (tarefa.created_at) {
+        const data = new Date(tarefa.created_at.replace(' ', 'T') + 'Z')
+        const mes = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
+        meses.add(mes)
+      }
+      if (tarefa.concluido_em) {
+        const data = new Date(tarefa.concluido_em.replace(' ', 'T') + 'Z')
+        const mes = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
+        meses.add(mes)
+      }
+    })
+    return Array.from(meses).sort().reverse()
+  }, [tarefas])
+
+  // Formatar mês
+  function formatarMes(mesAno) {
+    const [ano, mes] = mesAno.split('-')
+    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    return `${meses[parseInt(mes) - 1]}/${ano}`
+  }
+
+  // Filtrar tarefas
+  const tarefasFiltradas = useMemo(() => {
+    let resultado = tarefas
+    if (filtroResponsavel !== 'todos') {
+      resultado = resultado.filter(t => t.responsavel === filtroResponsavel)
+    }
+    const agora = new Date()
+    if (filtroMesAno !== 'todos') {
+      const [ano, mes] = filtroMesAno.split('-')
+      resultado = resultado.filter(t => {
+        const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
+        const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
+        return (dataCriacao && dataCriacao.getFullYear() === parseInt(ano) && dataCriacao.getMonth() === parseInt(mes) - 1) ||
+               (dataConclusao && dataConclusao.getFullYear() === parseInt(ano) && dataConclusao.getMonth() === parseInt(mes) - 1)
+      })
+    } else if (filtroPeriodo !== 'todos') {
+      switch(filtroPeriodo) {
+        case 'este_mes':
+          resultado = resultado.filter(t => {
+            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
+            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
+            return (dataCriacao && dataCriacao.getMonth() === agora.getMonth() && dataCriacao.getFullYear() === agora.getFullYear()) ||
+                   (dataConclusao && dataConclusao.getMonth() === agora.getMonth() && dataConclusao.getFullYear() === agora.getFullYear())
+          })
+          break
+        case 'mes_passado':
+          const mesPassado = new Date(agora.getFullYear(), agora.getMonth() - 1, 1)
+          resultado = resultado.filter(t => {
+            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
+            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
+            return (dataCriacao && dataCriacao.getMonth() === mesPassado.getMonth() && dataCriacao.getFullYear() === mesPassado.getFullYear()) ||
+                   (dataConclusao && dataConclusao.getMonth() === mesPassado.getMonth() && dataConclusao.getFullYear() === mesPassado.getFullYear())
+          })
+          break
+        case 'ultimos_3':
+          const tres = new Date(agora.getFullYear(), agora.getMonth() - 3, 1)
+          resultado = resultado.filter(t => {
+            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
+            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
+            return (dataCriacao && dataCriacao >= tres) || (dataConclusao && dataConclusao >= tres)
+          })
+          break
+        case 'ultimos_6':
+          const seis = new Date(agora.getFullYear(), agora.getMonth() - 6, 1)
+          resultado = resultado.filter(t => {
+            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
+            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
+            return (dataCriacao && dataCriacao >= seis) || (dataConclusao && dataConclusao >= seis)
+          })
+          break
+        case 'este_ano':
+          resultado = resultado.filter(t => {
+            const dataCriacao = t.created_at ? new Date(t.created_at.replace(' ', 'T') + 'Z') : null
+            const dataConclusao = t.concluido_em ? new Date(t.concluido_em.replace(' ', 'T') + 'Z') : null
+            return (dataCriacao && dataCriacao.getFullYear() === agora.getFullYear()) ||
+                   (dataConclusao && dataConclusao.getFullYear() === agora.getFullYear())
+          })
+          break
+      }
+    }
+    return resultado
+  }, [tarefas, filtroResponsavel, filtroPeriodo, filtroMesAno])
+
+  function handlePeriodoChange(valor) {
+    setFiltroPeriodo(valor)
+    if (valor !== 'customizado') setFiltroMesAno('todos')
+  }
+
+  function handleMesAnoChange(valor) {
+    setFiltroMesAno(valor)
+    setFiltroPeriodo(valor !== 'todos' ? 'customizado' : 'todos')
+  }
 
   // Calcular estatísticas
   const stats = useMemo(() => {
-    const tarefasFiltradas = filtroResponsavel === 'todos' 
-      ? tarefas 
-      : tarefas.filter(t => t.responsavel === filtroResponsavel)
-
     const total = tarefasFiltradas.length
     const concluidas = tarefasFiltradas.filter(t => t.status === 'concluido').length
     const ativas = total - concluidas
-
-    // Calcular atrasos
     let noPrazo = 0
     let atrasadas = 0
-
     tarefasFiltradas.forEach(tarefa => {
       if (tarefa.status === 'concluido') {
-        // Verificar se foi concluída no prazo
         if (tarefa.prazo_data && tarefa.concluido_em) {
           const prazoDate = parseISO(tarefa.prazo_data)
           if (tarefa.prazo_hora) {
@@ -33,12 +125,8 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           } else {
             prazoDate.setHours(23, 59, 59, 999)
           }
-          
-          // Converter formato do Supabase para ISO com UTC
           const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
           const concluidoDate = parseISO(concluidoISO)
-          
-          // Verificar se foi no prazo OU se tem justificativa dizendo que não estava atrasada
           if (concluidoDate <= prazoDate || tarefa.justificativa === 'Usuário informou que não estava atrasada') {
             noPrazo++
           } else {
@@ -46,7 +134,6 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           }
         }
       } else {
-        // Tarefa ativa: verificar se está atrasada
         if (tarefa.prazo_data) {
           const prazoDate = parseISO(tarefa.prazo_data)
           if (tarefa.prazo_hora) {
@@ -55,7 +142,6 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           } else {
             prazoDate.setHours(23, 59, 59)
           }
-          
           if (isPast(prazoDate) && !isToday(prazoDate)) {
             atrasadas++
           } else {
@@ -64,44 +150,64 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
         }
       }
     })
-
     const percentualNoPrazo = total > 0 ? ((noPrazo / total) * 100).toFixed(1) : 0
     const percentualAtrasadas = total > 0 ? ((atrasadas / total) * 100).toFixed(1) : 0
+    return { total, concluidas, ativas, noPrazo, atrasadas, percentualNoPrazo, percentualAtrasadas }
+  }, [tarefasFiltradas])
 
-    return {
-      total,
-      concluidas,
-      ativas,
-      noPrazo,
-      atrasadas,
-      percentualNoPrazo,
-      percentualAtrasadas
+  // Evolução mensal (últimos 12 meses)
+  const dadosEvolucao = useMemo(() => {
+    const agora = new Date()
+    const dados = []
+    for (let i = 11; i >= 0; i--) {
+      const mes = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
+      const mesAno = `${mes.getFullYear()}-${String(mes.getMonth() + 1).padStart(2, '0')}`
+      const tarefasDoMes = tarefas.filter(t => {
+        if (!t.concluido_em) return false
+        const data = new Date(t.concluido_em.replace(' ', 'T') + 'Z')
+        return data.getFullYear() === mes.getFullYear() && data.getMonth() === mes.getMonth()
+      })
+      let noPrazoMes = 0
+      let totalMes = 0
+      tarefasDoMes.forEach(tarefa => {
+        if (tarefa.prazo_data && tarefa.concluido_em) {
+          totalMes++
+          const prazoDate = parseISO(tarefa.prazo_data)
+          if (tarefa.prazo_hora) {
+            const [hora, minuto] = tarefa.prazo_hora.split(':')
+            prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
+          } else {
+            prazoDate.setHours(23, 59, 59, 999)
+          }
+          const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
+          const concluidoDate = parseISO(concluidoISO)
+          if (concluidoDate <= prazoDate || tarefa.justificativa === 'Usuário informou que não estava atrasada') {
+            noPrazoMes++
+          }
+        }
+      })
+      dados.push({
+        mes: formatarMes(mesAno),
+        percentual: totalMes > 0 ? parseFloat(((noPrazoMes / totalMes) * 100).toFixed(1)) : 0
+      })
     }
-  }, [tarefas, filtroResponsavel])
+    return dados
+  }, [tarefas])
 
   // Dados por responsável
   const dadosPorResponsavel = useMemo(() => {
     const responsaveis = {}
-
-    tarefas.forEach(tarefa => {
+    tarefasFiltradas.forEach(tarefa => {
       if (!responsaveis[tarefa.responsavel]) {
         responsaveis[tarefa.responsavel] = {
           nome: tarefa.responsavel_nome || tarefa.responsavel,
-          total: 0,
-          concluidas: 0,
-          ativas: 0,
-          noPrazo: 0,
-          atrasadas: 0
+          total: 0, concluidas: 0, ativas: 0, noPrazo: 0, atrasadas: 0
         }
       }
-
       const resp = responsaveis[tarefa.responsavel]
       resp.total++
-
       if (tarefa.status === 'concluido') {
         resp.concluidas++
-        
-        // Verificar se foi no prazo
         if (tarefa.prazo_data && tarefa.concluido_em) {
           const prazoDate = parseISO(tarefa.prazo_data)
           if (tarefa.prazo_hora) {
@@ -110,12 +216,8 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           } else {
             prazoDate.setHours(23, 59, 59, 999)
           }
-          
-          // Converter formato do Supabase para ISO com UTC
           const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
           const concluidoDate = parseISO(concluidoISO)
-          
-          // Verificar se foi no prazo OU se tem justificativa dizendo que não estava atrasada
           if (concluidoDate <= prazoDate || tarefa.justificativa === 'Usuário informou que não estava atrasada') {
             resp.noPrazo++
           } else {
@@ -124,8 +226,6 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
         }
       } else {
         resp.ativas++
-        
-        // Verificar se está atrasada
         if (tarefa.prazo_data) {
           const prazoDate = parseISO(tarefa.prazo_data)
           if (tarefa.prazo_hora) {
@@ -134,7 +234,6 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           } else {
             prazoDate.setHours(23, 59, 59)
           }
-          
           if (isPast(prazoDate) && !isToday(prazoDate)) {
             resp.atrasadas++
           } else {
@@ -143,23 +242,19 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
         }
       }
     })
-
     return Object.values(responsaveis)
-  }, [tarefas])
+  }, [tarefasFiltradas])
 
-  // Dados para gráfico de pizza (status)
   const dadosStatus = [
     { name: 'Concluídas', value: stats.concluidas },
     { name: 'Ativas', value: stats.ativas }
   ]
 
-  // Dados para gráfico de pizza (prazo)
   const dadosPrazo = [
     { name: 'No Prazo', value: stats.noPrazo },
     { name: 'Atrasadas', value: stats.atrasadas }
   ]
 
-  // Lista de responsáveis para filtro
   const responsaveisUnicos = useMemo(() => {
     const map = new Map()
     tarefas.forEach(t => {
@@ -171,14 +266,8 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
   }, [tarefas])
 
   function calcularStatusDetalhado(tarefa) {
-    if (tarefa.status !== 'concluido') {
-      return tarefa.status
-    }
-
-    if (!tarefa.prazo_data || !tarefa.concluido_em) {
-      return 'Concluída'
-    }
-
+    if (tarefa.status !== 'concluido') return tarefa.status
+    if (!tarefa.prazo_data || !tarefa.concluido_em) return 'Concluída'
     const prazoDate = parseISO(tarefa.prazo_data)
     if (tarefa.prazo_hora) {
       const [hora, minuto] = tarefa.prazo_hora.split(':')
@@ -186,43 +275,27 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     } else {
       prazoDate.setHours(23, 59, 59, 999)
     }
-
-    // Converter formato do Supabase para ISO com UTC
     const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + (tarefa.concluido_em.includes('Z') ? '' : 'Z')
     const concluidoDate = parseISO(concluidoISO)
-
-    if (concluidoDate <= prazoDate) {
-      return 'Concluída no prazo'
-    }
-
+    if (concluidoDate <= prazoDate) return 'Concluída no prazo'
     if (tarefa.justificativa) {
-      if (tarefa.justificativa === 'Usuário informou que não estava atrasada') {
-        return 'Concluída no prazo'
-      }
+      if (tarefa.justificativa === 'Usuário informou que não estava atrasada') return 'Concluída no prazo'
       return 'Concluída com atraso justificado'
     }
-
     return 'Concluída com atraso'
   }
 
   function formatarDataExcel(data) {
     if (!data || data === '-') return '-'
-    // Converter formato do Supabase para exibição
     const dataISO = data.replace(' ', 'T') + (data.includes('Z') || data.includes('+') ? '' : 'Z')
     const date = new Date(dataISO)
-    // Formatar para timezone local do Brasil
     return date.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'America/Sao_Paulo'
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo'
     })
   }
 
   function exportarExcel() {
-    // Preparar dados
     const dadosExport = tarefas.map(t => ({
       'Descrição': t.descricao,
       'Responsável': t.responsavel_nome || t.responsavel,
@@ -234,13 +307,9 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
       'Concluída em': t.concluido_em ? formatarDataExcel(t.concluido_em) : '-',
       'Justificativa': t.justificativa || '-'
     }))
-
-    // Criar planilha
     const ws = XLSX.utils.json_to_sheet(dadosExport)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Tarefas")
-
-    // Adicionar planilha de indicadores
     const indicadores = [
       { Indicador: 'Total de Tarefas', Valor: stats.total },
       { Indicador: 'Tarefas Concluídas', Valor: stats.concluidas },
@@ -250,8 +319,6 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     ]
     const wsIndicadores = XLSX.utils.json_to_sheet(indicadores)
     XLSX.utils.book_append_sheet(wb, wsIndicadores, "Indicadores")
-
-    // Adicionar desempenho por responsável
     const desempenho = dadosPorResponsavel.map(r => ({
       'Responsável': r.nome,
       'Total': r.total,
@@ -263,8 +330,6 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     }))
     const wsDesempenho = XLSX.utils.json_to_sheet(desempenho)
     XLSX.utils.book_append_sheet(wb, wsDesempenho, "Desempenho")
-
-    // Exportar
     XLSX.writeFile(wb, `relatorio-tarefas-${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
@@ -272,22 +337,55 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     <div className="space-y-6">
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filtrar por Responsável
-            </label>
-            <select
-              value={filtroResponsavel}
-              onChange={(e) => setFiltroResponsavel(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="todos">Todos</option>
-              {responsaveisUnicos.map(([id, nome]) => (
-                <option key={id} value={id}>{nome}</option>
-              ))}
-            </select>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Responsável</label>
+              <select
+                value={filtroResponsavel}
+                onChange={(e) => setFiltroResponsavel(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="todos">Todos</option>
+                {responsaveisUnicos.map(([id, nome]) => (
+                  <option key={id} value={id}>{nome}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Período</label>
+              <select
+                value={filtroPeriodo}
+                onChange={(e) => handlePeriodoChange(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="todos">Todo o período</option>
+                <option value="este_mes">Este mês</option>
+                <option value="mes_passado">Mês passado</option>
+                <option value="ultimos_3">Últimos 3 meses</option>
+                <option value="ultimos_6">Últimos 6 meses</option>
+                <option value="este_ano">Este ano</option>
+                <option value="customizado">Customizado</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Mês/Ano</label>
+              <select
+                value={filtroMesAno}
+                onChange={(e) => handleMesAnoChange(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={filtroPeriodo !== 'customizado' && filtroPeriodo !== 'todos'}
+              >
+                <option value="todos">Todos os meses</option>
+                {mesesDisponiveis.map(mes => (
+                  <option key={mes} value={mes}>{formatarMes(mes)}</option>
+                ))}
+              </select>
+            </div>
           </div>
+
           <button
             onClick={exportarExcel}
             className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-medium"
@@ -319,6 +417,21 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           <p className="text-sm text-gray-600 mb-1">Atrasadas</p>
           <p className="text-3xl font-bold text-red-600">{stats.percentualAtrasadas}%</p>
         </div>
+      </div>
+
+      {/* Gráfico de Evolução Mensal */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Evolução Mensal (% no Prazo)</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={dadosEvolucao}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="mes" />
+            <YAxis domain={[0, 100]} />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="percentual" stroke="#10b981" strokeWidth={2} name="% No Prazo" />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Gráficos */}
@@ -396,50 +509,24 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Responsável
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Concluídas
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ativas
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  No Prazo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Atrasadas
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  % No Prazo
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsável</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concluídas</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ativas</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No Prazo</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Atrasadas</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% No Prazo</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {dadosPorResponsavel.map((resp) => (
                 <tr key={resp.nome}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {resp.nome}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {resp.total}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                    {resp.concluidas}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                    {resp.ativas}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                    {resp.noPrazo}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                    {resp.atrasadas}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{resp.nome}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{resp.total}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">{resp.concluidas}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">{resp.ativas}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">{resp.noPrazo}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">{resp.atrasadas}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {resp.total > 0 ? `${((resp.noPrazo / resp.total) * 100).toFixed(1)}%` : '0%'}
                   </td>

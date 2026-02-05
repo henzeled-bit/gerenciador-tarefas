@@ -15,14 +15,37 @@ export default function PainelAdmin({ tarefas, onUpdate }) {
     const meses = new Set()
     tarefas.forEach(tarefa => {
       if (tarefa.created_at) {
-        const data = new Date(tarefa.created_at.replace(' ', 'T') + 'Z')
-        const mes = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
-        meses.add(mes)
+        try {
+          const data = new Date(tarefa.created_at.replace(' ', 'T') + 'Z')
+          if (!isNaN(data.getTime())) {
+            const mes = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
+            meses.add(mes)
+          }
+        } catch (e) {
+          // Ignora datas inválidas
+        }
       }
       if (tarefa.concluido_em) {
-        const data = new Date(tarefa.concluido_em.replace(' ', 'T') + 'Z')
-        const mes = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
-        meses.add(mes)
+        try {
+          const data = new Date(tarefa.concluido_em.replace(' ', 'T') + 'Z')
+          if (!isNaN(data.getTime())) {
+            const mes = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
+            meses.add(mes)
+          }
+        } catch (e) {
+          // Ignora datas inválidas
+        }
+      }
+      if (tarefa.prazo_data) {
+        try {
+          const data = new Date(tarefa.prazo_data + 'T00:00:00')
+          if (!isNaN(data.getTime())) {
+            const mes = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
+            meses.add(mes)
+          }
+        } catch (e) {
+          // Ignora datas inválidas
+        }
       }
     })
     return Array.from(meses).sort().reverse()

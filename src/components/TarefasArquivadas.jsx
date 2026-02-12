@@ -88,6 +88,33 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
     return `${meses[parseInt(mes) - 1]}/${ano}`
   }
 
+  // Calcular tempo de atraso
+  function calcularTempoAtraso(prazoDate, concluidoDate) {
+    const diffMs = concluidoDate - prazoDate
+    
+    if (diffMs <= 0) return null // Não atrasou
+    
+    const diffMinutos = Math.floor(diffMs / (1000 * 60))
+    const diffHoras = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    
+    if (diffDias > 0) {
+      const horas = diffHoras % 24
+      if (horas > 0) {
+        return `${diffDias} dia${diffDias > 1 ? 's' : ''} e ${horas} hora${horas > 1 ? 's' : ''}`
+      }
+      return `${diffDias} dia${diffDias > 1 ? 's' : ''}`
+    } else if (diffHoras > 0) {
+      const minutos = diffMinutos % 60
+      if (minutos > 0) {
+        return `${diffHoras} hora${diffHoras > 1 ? 's' : ''} e ${minutos} minuto${minutos > 1 ? 's' : ''}`
+      }
+      return `${diffHoras} hora${diffHoras > 1 ? 's' : ''}`
+    } else {
+      return `${diffMinutos} minuto${diffMinutos > 1 ? 's' : ''}`
+    }
+  }
+
   // Filtrar tarefas por período
   const tarefasFiltradas = useMemo(() => {
     const agora = new Date()
@@ -266,9 +293,38 @@ export default function TarefasArquivadas({ tarefas, isAdmin, onUpdate }) {
                       Responsável: <span className="font-medium">{tarefa.responsavel_nome}</span>
                     </p>
                     
-                    <p className="text-sm text-gray-600">
+                    {tarefa.prazo_data && (
+                      <p className="text-sm text-gray-600 mb-2">
+                        Prazo: <span className="font-medium">
+                          {format(parseISO(tarefa.prazo_data), 'dd/MM/yyyy', { locale: ptBR })}
+                          {tarefa.prazo_hora && ` às ${tarefa.prazo_hora}`}
+                        </span>
+                      </p>
+                    )}
+                    
+                    <p className="text-sm text-gray-600 mb-2">
                       Concluída em: <span className="font-medium">{formatarData(tarefa.concluido_em)}</span>
                     </p>
+
+                    {/* Mostrar tempo de atraso */}
+                    {tarefa.prazo_data && tarefa.concluido_em && (() => {
+                      const prazoDate = parseISO(tarefa.prazo_data)
+                      if (tarefa.prazo_hora) {
+                        const [hora, minuto] = tarefa.prazo_hora.split(':')
+                        prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
+                      } else {
+                        prazoDate.setHours(23, 59, 59, 999)
+                      }
+                      const concluidoISO = tarefa.concluido_em.replace(' ', 'T') + 'Z'
+                      const concluidoDate = parseISO(concluidoISO)
+                      const atraso = calcularTempoAtraso(prazoDate, concluidoDate)
+                      
+                      return atraso && tarefa.justificativa !== 'Usuário informou que não estava atrasada' ? (
+                        <p className="text-sm text-red-600 mb-2">
+                          ⏱️ Atraso: <span className="font-medium">{atraso}</span>
+                        </p>
+                      ) : null
+                    })()}
 
                     {tarefa.justificativa && (
                       <div className="mt-3 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">

@@ -12,16 +12,23 @@ export default function ModalConcluir({ tarefa, onClose, onSuccess }) {
   function calcularAtraso() {
     if (!tarefa.prazo_data) return false
     
-    const prazoDate = parseISO(tarefa.prazo_data)
+    // Criar data no timezone local (Brasil)
+    const [ano, mes, dia] = tarefa.prazo_data.split('-')
+    const prazoDate = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia))
     
     if (tarefa.prazo_hora) {
       const [hora, minuto] = tarefa.prazo_hora.split(':')
-      prazoDate.setHours(parseInt(hora), parseInt(minuto))
+      prazoDate.setHours(parseInt(hora), parseInt(minuto), 0, 0)
     } else {
-      prazoDate.setHours(23, 59, 59)
+      prazoDate.setHours(23, 59, 59, 999)
     }
     
-    return isPast(prazoDate) && !isToday(prazoDate)
+    // Adicionar tolerância de 30 minutos
+    prazoDate.setMinutes(prazoDate.getMinutes() + 30)
+    
+    // Considera atrasada se passou do prazo + 30 min
+    const agora = new Date()
+    return agora > prazoDate
   }
 
   const atrasada = calcularAtraso()
